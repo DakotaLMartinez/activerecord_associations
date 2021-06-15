@@ -14,9 +14,20 @@ To get a sense of how ActiveRecord associations work, we'll again refer to the C
 │   └── setup
 ├── db
 │   ├── Chinook_Sqlite.sqlite
-│   └── migrate
+│   ├── migrate
+│   │   ├── 20210615143927_create_posts.rb
+│   │   ├── 20210615143942_create_tags.rb
+│   │   └── 20210615143947_create_post_tags.rb
+│   ├── schema.rb
+│   └── test.sqlite
+├── img
+│   └── quick_query_for_ac_dc.png
 ├── lib
 │   ├── activerecord_associations
+│   │   ├── album.rb
+│   │   ├── artist.rb
+│   │   ├── many_to_many.rb
+│   │   ├── models.rb
 │   │   └── version.rb
 │   └── activerecord_associations.rb
 └── spec
@@ -32,6 +43,7 @@ Also, here's the `Rakefile` to show how we set up the console:
 # Rakefile
 require "rspec/core/rake_task"
 require "pry"
+require "sinatra/activerecord/rake"
 require_relative "./lib/activerecord_associations"
 
 desc "starts a console"

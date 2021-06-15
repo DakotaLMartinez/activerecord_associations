@@ -13,7 +13,7 @@ task :chinook do
   ActiveRecord::Base.establish_connection(
     adapter: 'sqlite3',
     database: 'db/Chinook_Sqlite.sqlite'
-)
+  )
   Pry.start
 end
 
