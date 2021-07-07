@@ -5,7 +5,7 @@ require_all "./lib/activerecord_associations"
 
 ActiveRecord::Base.establish_connection(
   adapter: 'sqlite3', 
-  database: 'db/ar_chinook.sqlite'
+  database: 'db/test.sqlite'
 )
 
 module ActiverecordAssociations

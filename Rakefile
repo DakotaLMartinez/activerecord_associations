@@ -5,6 +5,10 @@ require_relative "./lib/activerecord_associations"
 
 desc "starts a console"
 task :console do 
+  ActiveRecord::Base.establish_connection(
+    adapter: 'sqlite3',
+    database: 'db/test.sqlite'
+  )
   Pry.start
 end
 
