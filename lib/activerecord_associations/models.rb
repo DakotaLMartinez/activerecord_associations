@@ -1,0 +1,11 @@
+class Album < ActiveRecord::Base; end
+class Artist < ActiveRecord::Base; end
+class Customer < ActiveRecord::Base; end
+class Employee < ActiveRecord::Base; end
+class Genre < ActiveRecord::Base; end
+class Invoice < ActiveRecord::Base; end
+class InvoiceLine < ActiveRecord::Base; end
+class MediaType < ActiveRecord::Base; end
+class Playlist < ActiveRecord::Base; end
+class PlaylistTrack < ActiveRecord::Base; end
+class Track < ActiveRecord::Base; end
