@@ -297,10 +297,10 @@ ActiveRecord::Base.methods.select{|m| m.to_s.match("has_many")}
 => [:has_many]
 ```
 
-Okay, so we've confirmed that this method is coming from `ActiveRecord::Base`, now let's go look at the docs for [ActiveRecord::Base](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Base.html){:target="_blank"}. At the bottom of this page, there's a list of links to included modules. Including a module within a class adds all of its methods. About 2/3 the way down in the list, you'll see [ActiveRecord::Associations](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations.html){:target="_blank"}. There, you'll see a module and a namespace linked at the bottom. Both are relevant when thinking about and working with ActiveRecord association methods:
+Okay, so we've confirmed that this method is coming from `ActiveRecord::Base`, now let's go look at the docs for [ActiveRecord::Base](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Base.html). At the bottom of this page, there's a list of links to included modules. Including a module within a class adds all of its methods. About 2/3 the way down in the list, you'll see [ActiveRecord::Associations](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations.html). There, you'll see a module and a namespace linked at the bottom. Both are relevant when thinking about and working with ActiveRecord association methods:
 
-- [MODULE ActiveRecord::Associations::ClassMethods](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html){:target="_blank"}
-- [CLASS ActiveRecord::Associations::CollectionProxy](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/CollectionProxy.html){:target="_blank"}
+- [MODULE ActiveRecord::Associations::ClassMethods](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html)
+- [CLASS ActiveRecord::Associations::CollectionProxy](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/CollectionProxy.html)
 
 To dig into the `has_many` macro itself, we'll want to check out the top link to the `ClassMethods` module. At the top of this doc, this is how the module is described:
 
@@ -308,9 +308,47 @@ To dig into the `has_many` macro itself, we'll want to check out the top link to
 
 The key takeaway for right now is that these methods (`has_many` and `belongs_to`) are macro-like methods. So, much like `attr_accessor` the purpose of `has_many` and `belongs_to` is to add methods to the class. In this case, we use the macros to create association methods. I'd strongly recommend bookmarking this web page and revisiting it often over the next few weeks & months. It contains more information and examples than you'll need at first, but over time, you'll get more out of this doc as you revisit and re-read it. The top part of the documentation gives a bunch of examples and different scenarios, while the bottom of the docs describe the association macros, the options you can pass and the affect that they have on the generated methods. This is the part we'll focus on now. Here are links to the docs for the 2 association macros that we'll be using:
 
-- [belongs_to](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html#method-i-belongs_to){:target="_blank"}
-- [has_many](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html#method-i-has_many){:target="_blank"}
+- [belongs_to](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html#method-i-belongs_to)
+- [has_many](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html#method-i-has_many)
 
+If we check out the docs for the `has_many` method, we see detailed descriptions of the methods added by the macro, including a list of examples:
+
+#### Example
+A Firm class declares has_many :clients, which will add:
+```
+Firm#clients (similar to Client.where(firm_id: id))
+
+Firm#clients<<
+
+Firm#clients.delete
+
+Firm#clients.destroy
+
+Firm#clients=
+
+Firm#client_ids
+
+Firm#client_ids=
+
+Firm#clients.clear
+
+Firm#clients.empty? (similar to firm.clients.size == 0)
+
+Firm#clients.size (similar to Client.count "firm_id = #{id}")
+
+Firm#clients.find (similar to Client.where(firm_id: id).find(id))
+
+Firm#clients.exists?(name: 'ACME') (similar to Client.exists?(name: 'ACME', firm_id: firm.id))
+
+Firm#clients.build (similar to Client.new(firm_id: id))
+
+Firm#clients.create (similar to c = Client.new(firm_id: id); c.save; c)
+
+Firm#clients.create! (similar to c = Client.new(firm_id: id); c.save!)
+
+Firm#clients.reload
+```
+The declaration can also include an options hash to specialize the behavior of the association.
 >When we use the `has_many` macro in a class, `ActiveRecord` assumes that the class on the other end of that relationship has an all lower case, snake case foreign key matching the name of the calling class followed by `_id`.
 
 So, when `ActiveRecord` sees 
@@ -327,39 +365,54 @@ It makes a few assumptions:
 * The table associated with the `Album` class has a foreign key of `artist_id` (lower case, snake case name of calling class followed by `_id`)
 * You want to use the primary key on the `Artist` class's associated table to match with the foreign key on the `Album` class's associated table.
 
-As you may have guessed, you can override these assumptions if you need to! In this case, we can actually see that the primary key is working properly because it's being included in the query:
+In our example, check out the query that's generated:
 
 ```sql
-SELECT "Album".* FROM "Album" WHERE "Album"."artist_id" = ?  [["artist_id", 1]]
+Artist.first.albums
+D, [2021-07-06T23:56:50.669228 #95393] DEBUG -- :   Artist Load (12.5ms)  SELECT  "artists".* FROM "artists" ORDER BY "artists"."id" ASC LIMIT ?  [["LIMIT", 1]]
+D, [2021-07-06T23:56:50.705474 #95393] DEBUG -- :   Album Load (0.6ms)  SELECT "albums".* FROM "albums" WHERE "albums"."artist_id" = ?  [["artist_id", 1]]
+=> [#<Album:0x00007ff6c20cb2f8 id: 1, title: "For Those About To Rock We Salute You", artist_id: 1>,
+ #<Album:0x00007ff6c20ca2b8 id: 4, title: "Let There Be Rock", artist_id: 1>]
 ```
-What we need is to adjust the name of the foreign key to match what it's actually called within our Chinook database. In order to allow us to override the defaults, both the `has_many` and `belongs_to` macros allow us to pass a second argument (after the name of the association) which is a hash of options. One of these is fittingly called `foreign_key`. 
+
+The foreign key "artist_id" is inferred from the context of the `has_many` method call. Since we called `has_many` within the `Artist` class, ActiveRecord assumes our foreign key will be `artist_id`. The primary key is always assumed to be `id`. This primary key is used within the bound parameter (the ? mark) within the SQL query. We're matching up the primary key value for the artist with the artist_id foreign key for the albums. If we needed to override either of those for any reason, we could pass options to has_many:
 
 ```rb
 class Artist < ActiveRecord::Base
-  self.table_name = "Artist"
-  has_many :albums, foreign_key: "ArtistId"
+  has_many :albums, primary_key: "hello", foreign_key: "world"
 end
 ```
 
-Test this out by restarting `rake chinook` and then running `Artist.first.albums` again. 
-
 ```rb
-[1] pry(main)> Artist.first.albums
-D, [2021-06-14T17:20:20.997680 #70659] DEBUG -- :   Artist Load (0.4ms)  SELECT  "Artist".* FROM "Artist" ORDER BY "Artist"."ArtistId" ASC LIMIT ?  [["LIMIT", 1]]
-D, [2021-06-14T17:20:21.049157 #70659] DEBUG -- :   Album Load (1.0ms)  SELECT "Album".* FROM "Album" WHERE "Album"."ArtistId" = ?  [["ArtistId", 1]]
-=> [#<Album:0x00007fac0e99f630 AlbumId: 1, Title: "For Those About To Rock We Salute You", ArtistId: 1>,
- #<Album:0x00007fac0e99efc8 AlbumId: 4, Title: "Let There Be Rock", ArtistId: 1>]
+Artist.first.albums
+D, [2021-07-07T00:09:42.729226 #45050] DEBUG -- :   Artist Load (0.3ms)  SELECT  "artists".* FROM "artists" ORDER BY "artists"."id" ASC LIMIT ?  [["LIMIT", 1]]
+D, [2021-07-07T00:09:42.801076 #45050] DEBUG -- :   Album Load (0.5ms)  SELECT "albums".* FROM "albums" WHERE "albums"."world" = ?  [["world", nil]]
+D, [2021-07-07T00:09:42.802363 #45050] DEBUG -- :   Album Load (0.7ms)  SELECT  "albums".* FROM "albums" WHERE "albums"."world" IS NULL LIMIT ?  [["LIMIT", 11]]
+=> #<Album::ActiveRecord_Associations_CollectionProxy:0x3fdf330947d0>
 ```
 
-This time you're actually getting Albums back!
+Notice that this time the foreign_key is "albums"."world" and the bound parameter is `nil` because there is no such primary key "hello". Oddly enough, we don't get an error here, we're just not getting anything back. So, if you're working on an association and feel like you're getting nothing back when you should be seeing something, make sure to take a look at the SQL query it's firing off and take a look at your schema while you're at it. You should be able to see the problem if you put your eyes in those two places side by side.
+
+Overriding the primary key can be useful if you're working with data that you've imported from another database and you need to modify the queries to use primary keys imported from the other database rather than the ones added by active record.
+
+Overriding the foreign key can be useful if your foreign key doesn't match the convention. For example if you wanted to have a post belong to an author, but your class name for the Author is really User. In this case, your foreign key for retrieving all of a user's posts would be author_id:
+
+```rb
+class User < ActiveRecord::Base
+  has_many :posts, foreign_key: "author_id"
+end
+
+class Post < ActiveRecord::Base
+  belongs_to :author, class_name: "User"
+end
+```
 
 ## One-to-One relationships
 
-Okay, so we've handled the `has_many` side of the relationship, now we need to attend to the `belongs_to` side. Again, the syntax for this reads much like how you would say it:
+Okay, so we've handled the `has_many` side of the relationship, now we need to attend to the [belongs_to](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html#method-i-belongs_to) side. Again, the syntax for this reads much like how you would say it:
 
 ```rb
 class Album < ActiveRecord::Base
-  self.table_name = "Album"
   belongs_to :artist
 end
 ```
@@ -367,21 +420,26 @@ end
 Now, let's restart `rake chinook` and try `Album.first.artist`
 
 ```rb
-[1] pry(main)> Album.first.artist
-D, [2021-06-14T17:23:03.445490 #71205] DEBUG -- :   Album Load (0.1ms)  SELECT  "Album".* FROM "Album" ORDER BY "Album"."AlbumId" ASC LIMIT ?  [["LIMIT", 1]]
-=> nil
+Album.first.artist
+D, [2021-07-07T00:19:35.985241 #46910] DEBUG -- :   Album Load (0.8ms)  SELECT  "albums".* FROM "albums" ORDER BY "albums"."id" ASC LIMIT ?  [["LIMIT", 1]]
+D, [2021-07-07T00:19:36.268457 #46910] DEBUG -- :   Artist Load (0.9ms)  SELECT  "artists".* FROM "artists" WHERE "artists"."id" = ? LIMIT ?  [["id", 1], ["LIMIT", 1]]
+=> #<Artist:0x00007f8f431318c8 id: 1, name: "AC/DC">
 ```
 
-Hmm, not so much. This SQL statement is a little less helpful as an indicator of what went wrong here. It's only selecting from `"Album"` and not from `Artist` which seems wrong. Given what we know about `ActiveRecord` and the convention over configuration mindset, however, let's assume that we need to tell ActiveRecord to use `ArtistId` as the foreign key. 
+Wonderful! Breaking down that query again, this time we have another SELECT statement, this time we're looking for a match between the `artist_id` foreign key of the album we found (in this case `1` because the first Album's artist_id is `1`) matches the `id` primary key of the `artist`. There's also a limit to the number of results here as we only want one record back. This shouldn't be a problem, because primary keys are unique–so we should only find one artist that matches anyway.
 
-```rb
-[1] pry(main)> Album.first.artist
-D, [2021-06-14T17:26:30.526486 #72010] DEBUG -- :   Album Load (0.5ms)  SELECT  "Album".* FROM "Album" ORDER BY "Album"."AlbumId" ASC LIMIT ?  [["LIMIT", 1]]
-D, [2021-06-14T17:26:30.549382 #72010] DEBUG -- :   Artist Load (0.5ms)  SELECT  "Artist".* FROM "Artist" WHERE "Artist"."ArtistId" = ? LIMIT ?  [["ArtistId", 1], ["LIMIT", 1]]
-=> #<Artist:0x00007fa0ff064eb8 ArtistId: 1, Name: "AC/DC">
-```
+Now we've got two SQL queries. One loading the Album, triggered by `Album.first` and the next loading the associated `Artist` generated when we chain on `.artist`. Belongs to assumes that the foreign key to support the relationship is on the associated table and that it is named `other_model_id`. If the foreign key in Chinook was actually `ArtistId` we would need to specify that by adding the `foreign_key: 'ArtistId'` option when invoking the `belongs_to` macro.
 
-Now we've got two SQL queries. One loading the Album, triggered by `Album.first` and the next loading the associated `Artist` generated when we chain on `.artist`. Belongs to assumes that the foreign key to support the relationship is on the associated table and that it is named `other_model_id`. Because the foreign key in Chinook is actually `ArtistId` we had to specify that by adding the `foreign_key` option when invoking the `belongs_to` macro.
+If we need to refer to examples of the different options we can use with `belongs_to`, we can consult [the docs on api.rubyonrails.org](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html#method-i-belongs_to) or the [shorter belongs_to docs on APIdock](https://apidock.com/rails/ActiveRecord/Associations/ClassMethods/belongs_to)
+
+### Group Discussion (7-10 minutes)
+
+Take a few minutes to go through the Chinook database and identify as many one-to-many relationships as you can. Try adding them to the classes inside of `lib/activerecord_associations/chinook` and then playing around with instances in the console.
+
+1. Look through the database using SQLITE Explorer
+2. Find a one-to-many relationship
+3. Add the necessary macros to the appropriate class
+4. open `rake chinook` and try out some of the association methods added by your macros
 
 ## Many to Many relationships
 
@@ -424,7 +482,7 @@ JoinModel.belongs_to :model_two
 
 If you need to change the name of the association to something that doesn't match an association that exists on the join model, then you need to specify the `source` option.
 
-An example of this would be our `User` - `Like` - `Tweet` example because there are 2 types of relationship between `User` and `Tweet`. One that's one-to-many ther other that's many-to-many. We'd do this in ActiveRecord like so:
+An example of this would be our `User` - `Like` - `Tweet` example because there are 2 types of relationship between `User` and `Tweet`. One that's one-to-many, the other that's many-to-many. We'd do this in ActiveRecord like so:
 
 ```rb
 class User < ActiveRecord::Base
@@ -445,32 +503,26 @@ class Tweet < ActiveRecord::Base
 end
 ```
 
-Within Chinook, we can add a many to many relationship between `Playlist` and `Track` through `PlaylistTrack`
+Within our chinook classes, we can add a many to many relationship between `Playlist` and `Track` through `PlaylistTrack`
 
 ```rb
 class Playlist < ActiveRecord::Base
-  self.table_name = "Playlist"
-  has_many :playlist_tracks, foreign_key: "PlaylistId"
-  has_many :tracks, through: :playlist_tracks
+  # add macros for many to many Playlist <=> Track
 end
 
 class PlaylistTrack < ActiveRecord::Base
-  self.table_name = "PlaylistTrack"
-  belongs_to :playlist, foreign_key: "PlaylistId"
-  belongs_to :track, foreign_key: "TrackId"
+  # add macros for many to many Playlist <=> Track
 end
 
 class Track < ActiveRecord::Base
-  self.table_name = "Track"
-  has_many :playlist_tracks, foreign_key: "TrackId"
-  has_many :playlists, through: :playlist_tracks
+  # add macros for many to many Playlist <=> Track
 end
 ```
 
 And now you're able to access the playlists associated with a track:
 
 ```rb
-[8] pry(main)> Playlist.last.tracks
+Playlist.last.tracks
 D, [2021-06-14T22:31:20.713617 #6066] DEBUG -- :   Playlist Load (0.2ms)  SELECT  "Playlist".* FROM "Playlist" ORDER BY "Playlist"."PlaylistId" DESC LIMIT ?  [["LIMIT", 1]]
 D, [2021-06-14T22:31:20.718884 #6066] DEBUG -- :   Track Load (0.4ms)  SELECT "Track".* FROM "Track" INNER JOIN "PlaylistTrack" ON "Track"."TrackId" = "PlaylistTrack"."TrackId" WHERE "PlaylistTrack"."PlaylistId" = ?  [["PlaylistId", 18]]
 => [#<Track:0x00007fda93ea6648
@@ -488,7 +540,7 @@ D, [2021-06-14T22:31:20.718884 #6066] DEBUG -- :   Track Load (0.4ms)  SELECT "T
 And then you can also access all the playlist associated with a track:
 
 ```rb
-[9] pry(main)> Track.first.playlists
+Track.first.playlists
 D, [2021-06-14T22:31:50.210824 #6066] DEBUG -- :   Track Load (0.2ms)  SELECT  "Track".* FROM "Track" ORDER BY "Track"."TrackId" ASC LIMIT ?  [["LIMIT", 1]]
 D, [2021-06-14T22:31:50.216590 #6066] DEBUG -- :   Playlist Load (0.2ms)  SELECT "Playlist".* FROM "Playlist" INNER JOIN "PlaylistTrack" ON "Playlist"."PlaylistId" = "PlaylistTrack"."PlaylistId" WHERE "PlaylistTrack"."TrackId" = ?  [["TrackId", 1]]
 => [#<Playlist:0x00007fda93f0db90 PlaylistId: 1, Name: "Music">,
@@ -508,138 +560,16 @@ The first macros that you learned about were `attr_reader`, `attr_writer` & `att
 => true
 ```
 
-This is a bit weird, but bear with me because I want to make a point about ruby syntax that can make things feel more magical than they are:
+Those methods are simpler and very familiar at this point. The association methods are new and deserve lots of attention and repetition. Here are the places I would bookmark and return to frequently for review:
+  - [APIDock belongs_to guide](https://apidock.com/rails/v5.2.3/ActiveRecord/Associations/ClassMethods/belongs_to)
+  - [APIDock has_many guide](https://apidock.com/rails/v5.2.3/ActiveRecord/Associations/ClassMethods/has_many)
+  - [MODULE ActiveRecord::Associations::ClassMethods on api.rubyonrails.org for greater detail and rigor](https://api.rubyonrails.org/v5.2.6/classes/ActiveRecord/Associations/ClassMethods.html)
 
-```rb
-[1] pry(main)> String.attr_accessor :secret
-=> nil
-[2] pry(main)> h = "hello"
-=> "hello"
-[3] pry(main)> h.secret = "world"
-=> "world"
-[4] pry(main)> h.secret
-=> "world"
-[5] pry(main)> h
-=> "hello"
-```
 
-This is an example of *monkey patching* (the act of extending one of Ruby's built in classes by directly adding a method to it). These syntaxes are functionally identical:
+I'd recommend referring to documentation virtually every single time you build out associations for the next few months as it's the best way to become quickly familiar with how to handle common scenarios and also to figure out how to handle variations on those scenarios. That said, you'll get a lot of mileage out of a couple of the methods you get from each macro.
 
-```rb
-String.attr_accessor :secret
-```
-and
-```rb
-class String
-  attr_accessor :secret
-end
-```
-and 
-```rb
-class String 
-  self.attr_accessor :secret
-end
-```
-
-To illustrate what this is doing, we can store the array of methods in the string class before invoking attr_accessor and then subtract those from the methods on the String class after we invoke it. For this, open up a new console (using `rake console` or `rake chinook` will both work for this but I'm going to do `rake chinook`)
-
-```rb
-string_methods = "hello".methods.sort
-String.attr_accessor :secret
-new_string_methods = "hello".methods.sort
-difference = new_string_methods - string_methods
-
-```
-And you'll see this as the value for `difference`:
-```rb
-=> [:secret, :secret=]
-```
-
-ActiveRecord's approach is to add functionalty via inheritance. So if we want to see what we get from `ActiveRecord::Base`, we can use a similar approach.
-
-```rb
-class Test 
-end
-class AR < ActiveRecord::Base
-end
-ar_class_methods = AR.methods.sort - Test.methods.sort
-# you will see a seemingly unending list of methods here. 
-# In fact there are 448 of them.
-ar_class_methods.length
-=> 448
-```
-
-The association macros are among these:
-
-```rb
-[15] pry(main)> ar_class_methods.include?(:has_many)
-=> true
-[16] pry(main)> ar_class_methods.include?(:belongs_to)
-=> true
-```
-
-Again, following this same approach, we can take a look at the methods added by has_many by:
-- taking one class that invokes `has_many`
-- taking another empty class that doesn't invoke `has_many` (we'll make a new one for this)
-- creating an instance of each class and storing them in variables called `with_has_many` and `without_has_many`, respectively.
-- subtracting the methods `without_has_many` responds to from the methods that `with_has_many` does.
-
-```rb
-class ArtistWithoutHasMany < ActiveRecord::Base
-  self.table_name = "Artist"
-end
-[2] pry(main)> with_has_many = Artist.new
-=> #<Artist:0x00007fddf45ffc60 ArtistId: nil, Name: nil>
-[3] pry(main)> without_has_many = ArtistWithoutHasMany.new
-=> #<ArtistWithoutHasMany:0x00007fddf8116240 ArtistId: nil, Name: nil>
-[4] pry(main)> has_many_methods = (with_has_many.methods - without_has_many.methods).sort
-=> [:after_add_for_albums,
- :after_add_for_albums=,
- :after_add_for_albums?,
- :after_remove_for_albums,
- :after_remove_for_albums=,
- :after_remove_for_albums?,
- :album_ids,
- :album_ids=,
- :albums,
- :albums=,
- :autosave_associated_records_for_albums,
- :before_add_for_albums,
- :before_add_for_albums=,
- :before_add_for_albums?,
- :before_remove_for_albums,
- :before_remove_for_albums=,
- :before_remove_for_albums?,
- :validate_associated_records_for_albums]
-```
-
-Of these, the one we will interact with most frequently *by far* is `:albums`. There are use cases where the `:album_ids` and `:album_ids=` methods are useful as well. Specifically, those can help out with checkbox inputs that are sometimes used with many to many relationships like the one between a `Post` and a `Tag`. If you want to learn more about [the methods added by `has_many`, APIdock](https://apidock.com/rails/ActiveRecord/Associations/ClassMethods/has_many) is where I'd recommend referring for documentation.
-
-One thing in particular that's special here is that when you call `albums` on an `artist` instance, you actually get an [`ActiveRecord::Associations::CollectionProxy`](https://edgeapi.rubyonrails.org/classes/ActiveRecord/Associations/CollectionProxy.html) for the `Album` class. This allows us to invoke methods from ActiveRecord on the collection of `albums` as if it were the `Album` class itself, though we're only concerned with `albums` that belong to the `artist` on which `albums` was invoked. 
-
-We could do the same thing to see what methods `belongs_to` adds to a model.
-
-```rb
-class AlbumWithoutBelongsTo < ActiveRecord::Base
-  self.table_name = "Album"
-end
-[2] pry(main)> with_belongs_to = Album.new
-=> #<Album:0x00007ff0ff473220 AlbumId: nil, Title: nil, ArtistId: nil>
-[3] pry(main)> without_belongs_to = AlbumWithoutBelongsTo.new
-=> #<AlbumWithoutBelongsTo:0x00007ff1029fc590 AlbumId: nil, Title: nil, ArtistId: nil>
-[4] pry(main)> belongs_to_methods = (with_belongs_to.methods - without_belongs_to.methods).sort
-=> [:artist,
- :artist=,
- :autosave_associated_records_for_artist,
- :belongs_to_counter_cache_after_update,
- :build_artist,
- :create_artist,
- :create_artist!,
- :reload_artist]
-```
-
-Of these, the first, `:artist` will be used most frequently, though there are cases where you'll want `artist=` as well. Sometimes `build_artist` will be useful, though this is less likely if you're using react as a frontend.
-
+- If you do `Artist.has_many :albums`, you're probably going to call the `@artist.albums` method the most.
+- If you do `Album.belongs_to :artist`, you're probably going to call the `@album.artist` method the most.
 ## Exercise
 
 For the exercise, there are 3 migrations written. 2 Are complete, the 3rd you'll need to fill in before running. (The schema version matches the prior migration, so as long as you wait to run `rake db:migrate` until you've completed the migration, it should work fine). If you run rspec, you should see 12 examples, 7 failures.
